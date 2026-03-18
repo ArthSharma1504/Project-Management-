@@ -1,13 +1,14 @@
 import {
   Box, Typography, Card, CardContent, Chip, CircularProgress,
   Button, Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, MenuItem, IconButton, Tooltip, Avatar, Divider,
-  Alert, Select, FormControl, InputLabel
+  TextField, MenuItem, IconButton, Divider,
+  Alert, Select, FormControl, InputLabel, Avatar
 } from '@mui/material'
 import {
   AddOutlined, ArrowBackOutlined, DragIndicatorOutlined,
   PersonOutlined, CalendarTodayOutlined, ArrowForwardOutlined,
-  CloseOutlined, CheckCircleOutlined
+  CloseOutlined, CheckCircleOutlined, Group, BugReport,
+  OpenInNew
 } from '@mui/icons-material'
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
@@ -17,8 +18,7 @@ import {
   getAvailableTransitionsApi, deleteTaskApi,
   type TaskResponse, type AvailableTransition
 } from '../api/tasks'
-import { getProjectApi, getMembersApi, type ProjectMember } from '../api/projects'
-import { getSdlcModelsApi, type SdlcModel } from '../api/projects'
+import { getProjectApi, getMembersApi, getSdlcModelsApi, type ProjectMember } from '../api/projects'
 
 // ─── PRIORITY CONFIG ─────────────────────────────────────────
 const priorityConfig: Record<string, { color: 'error' | 'warning' | 'info' | 'default'; label: string }> = {
@@ -104,6 +104,7 @@ export default function TaskBoardPage() {
 
   // ── State ──
   const [projectName, setProjectName] = useState('')
+  const [sdlcModelName, setSdlcModelName] = useState('')
   const [tasks, setTasks] = useState<TaskResponse[]>([])
   const [phases, setPhases] = useState<{ id: number; name: string; isTerminal: boolean }[]>([])
   const [members, setMembers] = useState<ProjectMember[]>([])
@@ -143,10 +144,10 @@ export default function TaskBoardPage() {
         setTasks(taskList)
         setMembers(memberList)
 
-        // Load SDLC phases for this project
         const sdlcModels = await getSdlcModelsApi()
         const model = sdlcModels.find(m => m.id === project.sdlcModelId)
         if (model) {
+          setSdlcModelName(model.name)
           setPhases([...model.phases].sort((a, b) => a.displayOrder - b.displayOrder))
         }
       } catch {
@@ -239,26 +240,58 @@ export default function TaskBoardPage() {
 
       <Box sx={{ px: 3, py: 3 }}>
 
-        {/* Header */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-          <IconButton onClick={() => navigate('/projects')}>
+        {/* ── HEADER ── */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+          <IconButton onClick={() => navigate('/projects')} sx={{ mt: 0.5 }}>
             <ArrowBackOutlined />
           </IconButton>
+
           <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h5">{projectName}</Typography>
-            <Typography variant="body2" color="text.secondary">
-              {tasks.length} task{tasks.length !== 1 ? 's' : ''} across {phases.length} phases
-            </Typography>
+            <Typography variant="h5" fontWeight={700}>{projectName}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+              <Typography variant="body2" color="text.secondary">
+                {tasks.length} task{tasks.length !== 1 ? 's' : ''} · {phases.length} phases
+              </Typography>
+              {sdlcModelName && (
+                <Chip label={sdlcModelName} size="small" color="primary" variant="outlined" />
+              )}
+            </Box>
           </Box>
-          <Button variant="contained" startIcon={<AddOutlined />}
-            onClick={() => setCreateOpen(true)}>
-            Add Task
-          </Button>
+
+          {/* ── NAVIGATION BUTTONS ── */}
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Group />}
+              onClick={() => navigate(`/projects/${projectId}/members`)}
+              sx={{ borderColor: '#2563eb', color: '#2563eb', '&:hover': { bgcolor: '#eff6ff' } }}
+            >
+              Team Members
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<BugReport />}
+              onClick={() => navigate(`/projects/${projectId}/issues`)}
+              sx={{ borderColor: '#ef4444', color: '#ef4444', '&:hover': { bgcolor: '#fef2f2' } }}
+            >
+              Issues
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddOutlined />}
+              onClick={() => setCreateOpen(true)}
+            >
+              Add Task
+            </Button>
+          </Box>
         </Box>
 
-        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
 
-        {/* Kanban Board */}
+        {/* ── KANBAN BOARD ── */}
         <Box sx={{
           display: 'flex', gap: 2,
           overflowX: 'auto', pb: 2,
@@ -321,29 +354,28 @@ export default function TaskBoardPage() {
         </Box>
       </Box>
 
-      {/* ── Create Task Dialog ── */}
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)}
-        maxWidth="sm" fullWidth>
+      {/* ── CREATE TASK DIALOG ── */}
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Create New Task</DialogTitle>
         <DialogContent sx={{ pt: 2 }}>
           {createError && <Alert severity="error" sx={{ mb: 2 }}>{createError}</Alert>}
-          <TextField label="Title" value={newTitle}
+          <TextField fullWidth label="Title *" value={newTitle}
             onChange={e => setNewTitle(e.target.value)} sx={{ mb: 2 }} autoFocus />
-          <TextField label="Description (optional)" value={newDesc}
+          <TextField fullWidth label="Description (optional)" value={newDesc}
             onChange={e => setNewDesc(e.target.value)}
             multiline rows={3} sx={{ mb: 2 }} />
           <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-            <TextField select label="Priority" value={newPriority}
-              onChange={e => setNewPriority(e.target.value)} sx={{ flex: 1 }}>
+            <TextField select fullWidth label="Priority" value={newPriority}
+              onChange={e => setNewPriority(e.target.value)}>
               {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(p => (
                 <MenuItem key={p} value={p}>{p}</MenuItem>
               ))}
             </TextField>
-            <TextField label="Story Points" type="number" value={newPoints}
+            <TextField fullWidth label="Story Points" type="number" value={newPoints}
               onChange={e => setNewPoints(e.target.value ? Number(e.target.value) : '')}
-              sx={{ flex: 1 }} inputProps={{ min: 1, max: 100 }} />
+              inputProps={{ min: 1, max: 100 }} />
           </Box>
-          <TextField select label="Assign To (optional)" value={newAssignee}
+          <TextField select fullWidth label="Assign To (optional)" value={newAssignee}
             onChange={e => setNewAssignee(e.target.value ? Number(e.target.value) : '')}>
             <MenuItem value="">Unassigned</MenuItem>
             {members.map(m => (
@@ -362,15 +394,15 @@ export default function TaskBoardPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Move Task Dialog ── */}
+      {/* ── MOVE TASK DIALOG ── */}
       <Dialog open={moveOpen} onClose={() => setMoveOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Move Task</DialogTitle>
+        <DialogTitle>Move Task to Phase</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" mb={2}>
+          <Typography variant="body2" color="text.secondary" mb={1}>
             <b>{movingTask?.title}</b>
           </Typography>
           <Typography variant="caption" color="text.secondary" mb={1} display="block">
-            Current phase: <b>{movingTask?.currentPhaseName}</b>
+            Current: <b>{movingTask?.currentPhaseName}</b>
           </Typography>
           <Divider sx={{ mb: 2 }} />
           {moveLoading ? (
@@ -385,7 +417,7 @@ export default function TaskBoardPage() {
                 endIcon={t.requiresApproval
                   ? <Chip label="Needs Approval" size="small" color="warning" />
                   : <ArrowForwardOutlined />}>
-                {t.phaseName}
+                → {t.phaseName}
               </Button>
             ))
           )}
@@ -395,15 +427,14 @@ export default function TaskBoardPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ── Task Detail Dialog ── */}
-      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)}
-        maxWidth="sm" fullWidth>
+      {/* ── TASK DETAIL DIALOG ── */}
+      <Dialog open={detailOpen} onClose={() => setDetailOpen(false)} maxWidth="sm" fullWidth>
         {selectedTask && (
           <>
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <Box sx={{ pr: 2 }}>
                 <Typography variant="h6">{selectedTask.title}</Typography>
-                <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                <Box sx={{ display: 'flex', gap: 1, mt: 0.5, flexWrap: 'wrap' }}>
                   <Chip
                     label={priorityConfig[selectedTask.priority]?.label ?? selectedTask.priority}
                     color={priorityConfig[selectedTask.priority]?.color ?? 'default'}
@@ -411,7 +442,7 @@ export default function TaskBoardPage() {
                   />
                   <Chip label={selectedTask.currentPhaseName} size="small" variant="outlined" />
                   {selectedTask.isTerminalPhase && (
-                    <Chip label="Done" color="success" size="small" />
+                    <Chip label="Completed" color="success" size="small" />
                   )}
                 </Box>
               </Box>
@@ -419,15 +450,14 @@ export default function TaskBoardPage() {
                 <CloseOutlined />
               </IconButton>
             </DialogTitle>
+
             <DialogContent>
               {selectedTask.description && (
                 <>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Description
                   </Typography>
-                  <Typography variant="body2" mb={2}>
-                    {selectedTask.description}
-                  </Typography>
+                  <Typography variant="body2" mb={2}>{selectedTask.description}</Typography>
                   <Divider sx={{ mb: 2 }} />
                 </>
               )}
@@ -436,11 +466,9 @@ export default function TaskBoardPage() {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <PersonOutlined fontSize="small" color="action" />
                   <Typography variant="body2">
-                    <b>Assigned to:</b>{' '}
-                    {selectedTask.assignedToName ?? 'Unassigned'}
+                    <b>Assigned to:</b> {selectedTask.assignedToName ?? 'Unassigned'}
                   </Typography>
                 </Box>
-
                 {selectedTask.dueDate && (
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <CalendarTodayOutlined fontSize="small" color="action" />
@@ -449,18 +477,31 @@ export default function TaskBoardPage() {
                     </Typography>
                   </Box>
                 )}
-
                 {selectedTask.storyPoints && (
                   <Typography variant="body2">
                     <b>Story Points:</b> {selectedTask.storyPoints}
                   </Typography>
                 )}
-
                 <Typography variant="body2" color="text.secondary">
                   Created: {new Date(selectedTask.createdAt).toLocaleDateString()}
                 </Typography>
               </Box>
+
+              {/* Open full detail page link */}
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<OpenInNew />}
+                sx={{ mt: 3 }}
+                onClick={() => {
+                  setDetailOpen(false)
+                  navigate(`/projects/${projectId}/tasks/${selectedTask.id}`)
+                }}
+              >
+                Open Full Detail (Comments & More)
+              </Button>
             </DialogContent>
+
             <DialogActions sx={{ px: 3, pb: 2, justifyContent: 'space-between' }}>
               <Button color="error" onClick={() => handleDelete(selectedTask.id)}>
                 Delete Task
@@ -478,7 +519,6 @@ export default function TaskBoardPage() {
           </>
         )}
       </Dialog>
-
     </Box>
   )
 }

@@ -56,10 +56,11 @@ export const getMembersApi = async (projectId: number): Promise<ProjectMember[]>
   return res.data.data
 }
 
-export const addMemberApi = async (projectId: number, userId: number, role: string) => {
-  const res = await api.post(`/api/projects/${projectId}/members`, { userId, role })
-  return res.data.data
-}
+// CORRECT:
+export const addMemberApi = async (projectId: number, data: { userId: number; role: string }) => {
+  const res = await api.post(`/api/projects/${projectId}/members`, data);
+  return res.data.data;
+};
 
 export const removeMemberApi = async (projectId: number, targetUserId: number) => {
   await api.delete(`/api/projects/${projectId}/members/${targetUserId}`)
